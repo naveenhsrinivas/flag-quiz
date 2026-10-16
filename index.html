@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Flag & Capital Quiz</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="app">
+    <!-- Start screen -->
+    <section id="start-screen" class="screen">
+      <h1>🌍 Flag &amp; Capital Quiz</h1>
+      <p class="subtitle">Practise countries, capitals and flags.</p>
+
+      <div class="field">
+        <span class="label">Mode</span>
+        <div class="chips" id="mode-chips">
+          <button class="chip active" data-value="flag-country">Flag → Country</button>
+          <button class="chip" data-value="country-capital">Country → Capital</button>
+          <button class="chip" data-value="capital-country">Capital → Country</button>
+          <button class="chip" data-value="mixed">Mixed</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="label">Region</span>
+        <div class="chips" id="region-chips">
+          <button class="chip active" data-value="All">All</button>
+          <button class="chip" data-value="Africa">Africa</button>
+          <button class="chip" data-value="Asia">Asia</button>
+          <button class="chip" data-value="Europe">Europe</button>
+          <button class="chip" data-value="North America">North America</button>
+          <button class="chip" data-value="South America">South America</button>
+          <button class="chip" data-value="Oceania">Oceania</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="label">Questions</span>
+        <div class="chips" id="count-chips">
+          <button class="chip active" data-value="10">10</button>
+          <button class="chip" data-value="20">20</button>
+          <button class="chip" data-value="50">50</button>
+          <button class="chip" data-value="all">All</button>
+        </div>
+      </div>
+
+      <button id="start-btn" class="primary">Start quiz</button>
+      <p id="best-score" class="muted"></p>
+    </section>
+
+    <!-- Quiz screen -->
+    <section id="quiz-screen" class="screen hidden">
+      <div class="stats">
+        <span id="progress">1 / 10</span>
+        <span>Score <strong id="score">0</strong></span>
+        <span>🔥 <strong id="streak">0</strong></span>
+        <span>⏱ <strong id="timer">0:00</strong></span>
+      </div>
+      <div class="progress-bar"><div id="progress-fill"></div></div>
+
+      <div class="question">
+        <p id="question-text"></p>
+        <img id="question-flag" class="flag hidden" alt="Flag to identify">
+        <p id="question-prompt" class="prompt"></p>
+      </div>
+
+      <div id="options" class="options"></div>
+
+      <button id="next-btn" class="primary hidden">Next →</button>
+      <button id="quit-btn" class="link">Quit</button>
+    </section>
+
+    <!-- Results screen -->
+    <section id="results-screen" class="screen hidden">
+      <h2>Results</h2>
+      <p id="result-summary" class="big"></p>
+      <p id="result-detail" class="muted"></p>
+      <div id="mistakes"></div>
+      <div class="row">
+        <button id="retry-mistakes-btn" class="secondary">Practise mistakes</button>
+        <button id="again-btn" class="primary">Play again</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

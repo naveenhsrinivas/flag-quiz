@@ -1,0 +1,174 @@
+:root {
+  --bg: #f4f6fb;
+  --card: #ffffff;
+  --text: #1c2333;
+  --muted: #6b7489;
+  --border: #dfe3ec;
+  --accent: #3b6cf6;
+  --accent-text: #ffffff;
+  --correct: #1f9d55;
+  --correct-bg: #e3f6ea;
+  --wrong: #d64545;
+  --wrong-bg: #fbe6e6;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #11151f;
+    --card: #1b2130;
+    --text: #e8ecf5;
+    --muted: #8d97ad;
+    --border: #2c3447;
+    --accent: #6b91ff;
+    --accent-text: #0b1020;
+    --correct: #4cc782;
+    --correct-bg: #183326;
+    --wrong: #ff7b7b;
+    --wrong-bg: #3a1d1f;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  display: flex;
+  justify-content: center;
+  padding: 24px 16px;
+}
+
+.app {
+  width: 100%;
+  max-width: 640px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 28px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
+}
+
+.hidden { display: none !important; }
+
+h1 { margin: 0 0 4px; font-size: 1.8rem; }
+h2 { margin-top: 0; }
+.subtitle, .muted { color: var(--muted); }
+.big { font-size: 1.6rem; font-weight: 600; margin: 8px 0; }
+
+.field { margin: 20px 0; }
+.label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  padding: 8px 14px;
+  transition: background 0.15s, border-color 0.15s, transform 0.05s;
+}
+button:active { transform: scale(0.98); }
+
+.chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+  padding: 12px 20px;
+  width: 100%;
+  margin-top: 12px;
+}
+.secondary { padding: 12px 20px; width: 100%; margin-top: 12px; font-weight: 600; }
+.link { border: none; color: var(--muted); margin-top: 12px; width: 100%; }
+
+.stats {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+.stats strong { color: var(--text); }
+
+.progress-bar {
+  height: 6px;
+  background: var(--border);
+  border-radius: 99px;
+  margin: 10px 0 20px;
+  overflow: hidden;
+}
+#progress-fill { height: 100%; width: 0; background: var(--accent); transition: width 0.3s; }
+
+.question { text-align: center; margin-bottom: 20px; }
+#question-text { color: var(--muted); margin: 0 0 12px; }
+.prompt { font-size: 1.7rem; font-weight: 700; margin: 8px 0; }
+
+.flag {
+  width: 100%;
+  max-width: 320px;
+  aspect-ratio: 3 / 2;
+  object-fit: contain;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.option {
+  padding: 14px;
+  text-align: left;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-height: 56px;
+}
+.option:hover:not(:disabled) { border-color: var(--accent); }
+.option .key {
+  font-size: 0.75rem;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1px 6px;
+}
+.option.correct { background: var(--correct-bg); border-color: var(--correct); }
+.option.wrong { background: var(--wrong-bg); border-color: var(--wrong); }
+.option:disabled { cursor: default; }
+
+#mistakes { margin: 16px 0; }
+.mistake {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.mistake img { width: 48px; border-radius: 3px; border: 1px solid var(--border); }
+.mistake .you { color: var(--wrong); font-size: 0.9rem; }
+
+.row { display: flex; gap: 10px; }
+
+@media (max-width: 480px) {
+  .app { padding: 20px; }
+  .options { grid-template-columns: 1fr; }
+  .prompt { font-size: 1.4rem; }
+}
