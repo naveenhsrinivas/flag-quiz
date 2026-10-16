@@ -1,6 +1,6 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "flag-quiz", "runtimeExecutable": "python3", "runtimeArgs": ["-m", "http.server", "8000"], "port": 8000 }
+    { "name": "flag-quiz", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev", "--", "--port", "8000", "--strictPort"], "port": 8000 }
   ]
 }

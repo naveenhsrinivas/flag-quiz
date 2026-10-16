@@ -1,6 +1,26 @@
 // Country data: [ISO 3166-1 alpha-2 code, name, capital, region]
 // Flags are loaded from https://flagcdn.com using the lowercase code.
-const COUNTRIES = [
+export const REGIONS = [
+  "Africa",
+  "Asia",
+  "Europe",
+  "North America",
+  "South America",
+  "Oceania",
+] as const;
+
+export type Region = (typeof REGIONS)[number];
+
+export interface Country {
+  code: string;
+  name: string;
+  capital: string;
+  region: Region;
+}
+
+type CountryRow = [code: string, name: string, capital: string, region: Region];
+
+const ROWS: CountryRow[] = [
   // Africa
   ["dz", "Algeria", "Algiers", "Africa"],
   ["ao", "Angola", "Luanda", "Africa"],
@@ -209,4 +229,11 @@ const COUNTRIES = [
   ["to", "Tonga", "Nukuʻalofa", "Oceania"],
   ["tv", "Tuvalu", "Funafuti", "Oceania"],
   ["vu", "Vanuatu", "Port Vila", "Oceania"],
-].map(([code, name, capital, region]) => ({ code, name, capital, region }));
+];
+
+export const COUNTRIES: Country[] = ROWS.map(([code, name, capital, region]) => ({
+  code,
+  name,
+  capital,
+  region,
+}));
