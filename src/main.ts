@@ -1,8 +1,9 @@
 import "./style.css";
 import { COUNTRIES, type Country, type Region } from "./data";
+import type { WorldMap } from "./map";
 
 // ---------- Types ----------
-type ModeKey = "flag-country" | "country-capital" | "capital-country";
+type ModeKey = "flag-country" | "country-capital" | "capital-country" | "map";
 type ModeSetting = ModeKey | "mixed";
 type RegionSetting = Region | "All";
 type CountSetting = "10" | "20" | "50" | "all";
@@ -14,6 +15,7 @@ interface Settings {
 }
 
 interface Mode {
+  kind: "choice" | "map";
   text: string;
   showFlag: boolean;
   prompt: (c: Country) => string;
@@ -38,6 +40,8 @@ interface GameState {
   mistakes: Question[];
   seconds: number;
   isPractice: boolean;
+  /** Country tapped on the map but not yet confirmed. */
+  mapPick: string | null;
 }
 
 interface BestScore {
@@ -62,8 +66,8 @@ function shuffle<T>(arr: readonly T[]): T[] {
   return a;
 }
 
-function flagUrl(code: string): string {
-  return `https://flagcdn.com/w320/${code}.png`;
+function flagUrl(code: string, width: 80 | 320 | 640 = 320): string {
+  return `https://flagcdn.com/w${width}/${code}.png`;
 }
 
 function formatTime(seconds: number): string {
@@ -71,6 +75,8 @@ function formatTime(seconds: number): string {
   const s = String(seconds % 60).padStart(2, "0");
   return `${m}:${s}`;
 }
+
+const COUNTRY_BY_CODE = new Map(COUNTRIES.map((c) => [c.code, c]));
 
 // ---------- Settings (chip groups) ----------
 const settings: Settings = { mode: "flag-country", region: "All", count: "10" };
@@ -84,6 +90,8 @@ function setupChips<K extends keyof Settings>(groupId: string, key: K): void {
     chip.classList.add("active");
     settings[key] = chip.dataset.value as Settings[K];
     showBestScore();
+    // Start downloading the map as soon as a mode that needs it is picked.
+    if (needsMap()) getMap().catch(() => {});
   });
 }
 setupChips("mode-chips", "mode");
@@ -120,24 +128,57 @@ function showBestScore(): void {
 }
 showBestScore();
 
+// ---------- Map (loaded on demand) ----------
+let mapPromise: Promise<WorldMap> | null = null;
+let worldMap: WorldMap | null = null;
+
+function needsMap(): boolean {
+  return settings.mode === "map" || settings.mode === "mixed";
+}
+
+function getMap(): Promise<WorldMap> {
+  mapPromise ??= import("./map")
+    .then(async ({ loadWorld, WorldMap }) => {
+      const map = new WorldMap($("map"), await loadWorld(COUNTRIES));
+      map.onSelect = onMapPick;
+      worldMap = map;
+      return map;
+    })
+    .catch((err: unknown) => {
+      mapPromise = null; // allow a retry
+      throw err;
+    });
+  return mapPromise;
+}
+
 // ---------- Question building ----------
 const MODES: Record<ModeKey, Mode> = {
   "flag-country": {
+    kind: "choice",
     text: "Which country does this flag belong to?",
     showFlag: true,
     prompt: () => "",
     answer: (c) => c.name,
   },
   "country-capital": {
+    kind: "choice",
     text: "What is the capital of…",
     showFlag: false,
     prompt: (c) => c.name,
     answer: (c) => c.capital,
   },
   "capital-country": {
+    kind: "choice",
     text: "Which country has this capital?",
     showFlag: false,
     prompt: (c) => c.capital,
+    answer: (c) => c.name,
+  },
+  map: {
+    kind: "map",
+    text: "Find this country on the map",
+    showFlag: false,
+    prompt: (c) => c.name,
     answer: (c) => c.name,
   },
 };
@@ -149,6 +190,10 @@ function buildQuestion(country: Country): Question {
     settings.mode === "mixed" ? shuffle(MODE_KEYS)[0] : settings.mode;
   const mode = MODES[modeKey];
   const correct = mode.answer(country);
+
+  if (mode.kind === "map") {
+    return { country, modeKey, mode, correct, options: [] };
+  }
 
   // Prefer distractors from the same region so it's not too easy.
   const sameRegion = COUNTRIES.filter(
@@ -173,7 +218,29 @@ function buildQuestion(country: Country): Question {
 let state: GameState | null = null;
 let timerId: number | undefined;
 
-function startQuiz(countries?: Country[]): void {
+async function startQuiz(countries?: Country[]): Promise<void> {
+  const startBtn = $<HTMLButtonElement>("start-btn");
+  const error = $("start-error");
+  error.classList.add("hidden");
+
+  if (needsMap()) {
+    const label = startBtn.textContent;
+    startBtn.disabled = true;
+    startBtn.textContent = "Loading map…";
+    try {
+      const map = await getMap();
+      map.setRegion(settings.region);
+    } catch {
+      error.textContent = "Couldn't load the map. Check your connection and try again.";
+      error.classList.remove("hidden");
+      showScreen("start-screen");
+      return;
+    } finally {
+      startBtn.disabled = false;
+      startBtn.textContent = label;
+    }
+  }
+
   const pool =
     countries ??
     COUNTRIES.filter((c) => settings.region === "All" || c.region === settings.region);
@@ -192,6 +259,7 @@ function startQuiz(countries?: Country[]): void {
     mistakes: [],
     seconds: 0,
     isPractice: Boolean(countries),
+    mapPick: null,
   };
   state = game;
 
@@ -202,6 +270,8 @@ function startQuiz(countries?: Country[]): void {
   }, 1000);
 
   $("timer").textContent = "0:00";
+  // Map games get a wider card so the map has room.
+  app().classList.toggle("wide", game.questions.some((q) => q.mode.kind === "map"));
   showScreen("quiz-screen");
   renderQuestion(game);
 }
@@ -209,6 +279,7 @@ function startQuiz(countries?: Country[]): void {
 function renderQuestion(game: GameState): void {
   const q = game.questions[game.index];
   const total = game.questions.length;
+  const isMap = q.mode.kind === "map";
 
   $("progress").textContent = `${game.index + 1} / ${total}`;
   $("progress-fill").style.width = `${(game.index / total) * 100}%`;
@@ -216,15 +287,27 @@ function renderQuestion(game: GameState): void {
   $("streak").textContent = String(game.streak);
 
   $("question-text").textContent = q.mode.text;
-  $("question-prompt").textContent = q.mode.prompt(q.country);
+  $("prompt-text").textContent = q.mode.prompt(q.country);
   $("question-prompt").classList.toggle("hidden", q.mode.showFlag);
 
-  const flag = $<HTMLImageElement>("question-flag");
-  flag.classList.toggle("hidden", !q.mode.showFlag);
-  if (q.mode.showFlag) flag.src = flagUrl(q.country.code);
+  // In map mode a small flag sits next to the country name.
+  const promptFlag = $<HTMLImageElement>("prompt-flag");
+  promptFlag.classList.toggle("hidden", !isMap);
+  if (isMap) promptFlag.src = flagUrl(q.country.code, 80);
+
+  // Layout hooks for the CSS: map questions fill the screen, and the stage
+  // (flag or map) gets its own column on short landscape screens.
+  const hasStage = q.mode.showFlag || isMap;
+  $("quiz-stage").classList.toggle("hidden", !hasStage);
+  $("quiz-body").classList.toggle("has-stage", hasStage);
+  app().classList.toggle("map-q", isMap);
+
+  $("flag-stage").classList.toggle("hidden", !q.mode.showFlag);
+  if (q.mode.showFlag) setFlag($<HTMLImageElement>("question-flag"), q.country.code);
 
   const optionsEl = $("options");
   optionsEl.innerHTML = "";
+  optionsEl.classList.toggle("hidden", isMap);
   q.options.forEach((opt, i) => {
     const btn = document.createElement("button");
     btn.className = "option";
@@ -234,30 +317,42 @@ function renderQuestion(game: GameState): void {
     optionsEl.appendChild(btn);
   });
 
+  $("map-panel").classList.toggle("hidden", !isMap);
+  $("map-hint").classList.toggle("hidden", !isMap);
+  $("confirm-btn").classList.toggle("hidden", !isMap);
+  $("feedback").classList.add("hidden");
+  if (isMap) {
+    game.mapPick = null;
+    updateConfirm(game);
+    worldMap?.newQuestion();
+  }
+
   $("next-btn").classList.add("hidden");
 
   // Preload the next flag so it appears instantly.
   const nextQ = game.questions[game.index + 1];
-  if (nextQ) new Image().src = flagUrl(nextQ.country.code);
+  if (nextQ) {
+    const img = new Image();
+    if (nextQ.mode.showFlag) setFlag(img, nextQ.country.code);
+    else if (nextQ.mode.kind === "map") img.src = flagUrl(nextQ.country.code, 80);
+  }
 }
 
-function choose(game: GameState, value: string, btn: HTMLButtonElement): void {
-  const q = game.questions[game.index];
-  if (q.chosen !== undefined) return;
+function setFlag(img: HTMLImageElement, code: string): void {
+  img.srcset = `${flagUrl(code, 320)} 320w, ${flagUrl(code, 640)} 640w`;
+  img.sizes = "(max-width: 480px) 90vw, 360px";
+  img.src = flagUrl(code, 320);
+}
+
+/** Scores an answer and updates the stats; returns whether it was right. */
+function recordAnswer(game: GameState, q: Question, value: string): boolean {
   q.chosen = value;
-
-  const buttons = [...$("options").children] as HTMLButtonElement[];
-  buttons.forEach((b) => {
-    b.disabled = true;
-    if (b.lastChild?.textContent === q.correct) b.classList.add("correct");
-  });
-
-  if (value === q.correct) {
+  const right = value === q.correct;
+  if (right) {
     game.score++;
     game.streak++;
     game.bestStreak = Math.max(game.bestStreak, game.streak);
   } else {
-    btn.classList.add("wrong");
     game.streak = 0;
     game.mistakes.push(q);
   }
@@ -268,7 +363,53 @@ function choose(game: GameState, value: string, btn: HTMLButtonElement): void {
   nextBtn.classList.remove("hidden");
   nextBtn.textContent =
     game.index === game.questions.length - 1 ? "See results" : "Next →";
-  nextBtn.focus();
+  nextBtn.focus({ preventScroll: true });
+  return right;
+}
+
+function choose(game: GameState, value: string, btn: HTMLButtonElement): void {
+  const q = game.questions[game.index];
+  if (q.chosen !== undefined) return;
+
+  const buttons = [...$("options").children] as HTMLButtonElement[];
+  buttons.forEach((b) => {
+    b.disabled = true;
+    if (b.lastChild?.textContent === q.correct) b.classList.add("correct");
+  });
+
+  if (!recordAnswer(game, q, value)) btn.classList.add("wrong");
+}
+
+// ---------- Map answers ----------
+function onMapPick(code: string): void {
+  if (!state) return;
+  state.mapPick = code;
+  updateConfirm(state);
+}
+
+function updateConfirm(game: GameState): void {
+  const btn = $<HTMLButtonElement>("confirm-btn");
+  btn.disabled = !game.mapPick;
+  btn.textContent = game.mapPick ? "Confirm answer" : "Tap a country on the map";
+}
+
+function confirmMap(game: GameState): void {
+  const q = game.questions[game.index];
+  if (q.chosen !== undefined || !game.mapPick) return;
+
+  const picked = COUNTRY_BY_CODE.get(game.mapPick)!;
+  const right = recordAnswer(game, q, picked.name);
+  worldMap?.reveal(q.country.code, picked.code);
+
+  $("confirm-btn").classList.add("hidden");
+  $("map-hint").classList.add("hidden");
+  const feedback = $("feedback");
+  feedback.classList.remove("hidden");
+  feedback.classList.toggle("good", right);
+  feedback.classList.toggle("bad", !right);
+  feedback.textContent = right
+    ? `Correct! That's ${q.country.name}.`
+    : `Not quite. You picked ${picked.name}. ${q.country.name} is shown in green.`;
 }
 
 function next(): void {
@@ -304,6 +445,9 @@ function finish(game: GameState): void {
     const h = document.createElement("h3");
     h.textContent = "Review your mistakes";
     list.appendChild(h);
+    const rows = document.createElement("div");
+    rows.className = "mistake-list";
+    list.appendChild(rows);
     game.mistakes.forEach((q) => {
       const row = document.createElement("div");
       row.className = "mistake";
@@ -311,8 +455,9 @@ function finish(game: GameState): void {
       row.querySelector("img")!.src = flagUrl(q.country.code);
       row.querySelector("strong")!.textContent = q.country.name;
       row.querySelector(".cap")!.textContent = q.country.capital;
-      row.querySelector(".you")!.textContent = `You answered: ${q.chosen}`;
-      list.appendChild(row);
+      row.querySelector(".you")!.textContent =
+        q.mode.kind === "map" ? `You picked: ${q.chosen}` : `You answered: ${q.chosen}`;
+      rows.appendChild(row);
     });
   } else {
     list.innerHTML = "<p>Perfect score! 🎉</p>";
@@ -327,11 +472,23 @@ type ScreenId = "start-screen" | "quiz-screen" | "results-screen";
 function showScreen(id: ScreenId): void {
   const screens: ScreenId[] = ["start-screen", "quiz-screen", "results-screen"];
   screens.forEach((s) => $(s).classList.toggle("hidden", s !== id));
+  const playing = id === "quiz-screen";
+  app().classList.toggle("playing", playing);
+  if (!playing) app().classList.remove("wide", "map-q");
+  window.scrollTo({ top: 0 });
+}
+
+function app(): HTMLElement {
+  return document.querySelector<HTMLElement>(".app")!;
 }
 
 // ---------- Events ----------
 $("start-btn").addEventListener("click", () => startQuiz());
 $("next-btn").addEventListener("click", next);
+$("confirm-btn").addEventListener("click", () => state && confirmMap(state));
+$("zoom-in").addEventListener("click", () => worldMap?.zoomBy(2));
+$("zoom-out").addEventListener("click", () => worldMap?.zoomBy(0.5));
+$("zoom-reset").addEventListener("click", () => worldMap?.resetView(true));
 $("again-btn").addEventListener("click", () => {
   showBestScore();
   showScreen("start-screen");
@@ -345,15 +502,32 @@ $("quit-btn").addEventListener("click", () => {
   showScreen("start-screen");
 });
 
-// Keyboard: 1–4 to answer, Enter for next.
+// Keyboard: 1–4 to answer, Enter to confirm / go next, +/- to zoom the map.
 document.addEventListener("keydown", (e) => {
-  if ($("quiz-screen").classList.contains("hidden")) return;
+  if (!state || $("quiz-screen").classList.contains("hidden")) return;
+  const q = state.questions[state.index];
+
+  if (e.key === "Enter") {
+    const confirm = $<HTMLButtonElement>("confirm-btn");
+    if (!confirm.classList.contains("hidden") && !confirm.disabled) {
+      e.preventDefault();
+      confirmMap(state);
+    } else if (!$("next-btn").classList.contains("hidden")) {
+      e.preventDefault();
+      next();
+    }
+    return;
+  }
+
+  if (q.mode.kind === "map") {
+    if (e.key === "+" || e.key === "=") worldMap?.zoomBy(2);
+    else if (e.key === "-") worldMap?.zoomBy(0.5);
+    return;
+  }
+
   const buttons = [...$("options").children] as HTMLButtonElement[];
   const n = Number(e.key);
   if (n >= 1 && n <= buttons.length && !buttons[n - 1].disabled) {
     buttons[n - 1].click();
-  } else if (e.key === "Enter" && !$("next-btn").classList.contains("hidden")) {
-    e.preventDefault();
-    next();
   }
 });

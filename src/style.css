@@ -10,6 +10,20 @@
   --correct-bg: #e3f6ea;
   --wrong: #d64545;
   --wrong-bg: #fbe6e6;
+  --ocean: #dceaf7;
+  --ocean-edge: #c3d8ee;
+  --land: #f6f3ea;
+  --land-hover: #e8eefc;
+  --land-other: #e7e4dc;
+  --land-border: #b9b4a6;
+  --graticule: rgba(60, 100, 150, 0.12);
+  --overlay: rgba(255, 255, 255, 0.88);
+  --shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
+
+  /* Layout: space around the card, and inside it. */
+  --page-pad: 24px;
+  --card-pad: 28px;
+  --gap: 16px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -25,20 +39,33 @@
     --correct-bg: #183326;
     --wrong: #ff7b7b;
     --wrong-bg: #3a1d1f;
+    --ocean: #0f1a2b;
+    --ocean-edge: #1d2b44;
+    --land: #2a3346;
+    --land-hover: #34416a;
+    --land-other: #222a3a;
+    --land-border: #45506a;
+    --graticule: rgba(140, 170, 220, 0.08);
+    --overlay: rgba(20, 26, 40, 0.88);
+    --shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
   }
 }
 
 * { box-sizing: border-box; }
 
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+
 body {
   margin: 0;
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--bg);
   color: var(--text);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   display: flex;
   justify-content: center;
-  padding: 24px 16px;
+  align-items: flex-start;
+  padding: var(--page-pad) 16px;
 }
 
 .app {
@@ -47,17 +74,22 @@ body {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 16px;
-  padding: 28px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
+  padding: var(--card-pad);
+  box-shadow: var(--shadow);
+  transition: max-width 0.3s ease;
 }
+.app.wide { max-width: 1100px; }
 
 .hidden { display: none !important; }
 
-h1 { margin: 0 0 4px; font-size: 1.8rem; }
+h1 { margin: 0 0 4px; font-size: clamp(1.4rem, 1.1rem + 1.5vw, 1.9rem); }
 h2 { margin-top: 0; }
 .subtitle, .muted { color: var(--muted); }
+.subtitle { margin: 0 0 4px; }
 .big { font-size: 1.6rem; font-weight: 600; margin: 8px 0; }
+.error { color: var(--wrong); }
 
+/* ---------- Start screen ---------- */
 .field { margin: 20px 0; }
 .label {
   display: block;
@@ -79,9 +111,13 @@ button {
   background: transparent;
   color: var(--text);
   padding: 8px 14px;
+  min-height: 40px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
   transition: background 0.15s, border-color 0.15s, transform 0.05s;
 }
 button:active { transform: scale(0.98); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .chip.active {
   background: var(--accent);
@@ -99,14 +135,29 @@ button:active { transform: scale(0.98); }
   margin-top: 12px;
 }
 .secondary { padding: 12px 20px; width: 100%; margin-top: 12px; font-weight: 600; }
-.link { border: none; color: var(--muted); margin-top: 12px; width: 100%; }
 
+.icon-btn {
+  min-height: 0;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-color: transparent;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1;
+  flex: none;
+}
+.icon-btn:hover { border-color: var(--border); color: var(--text); }
+
+/* ---------- Quiz screen ---------- */
 .stats {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 8px;
   font-size: 0.95rem;
   color: var(--muted);
+  white-space: nowrap;
 }
 .stats strong { color: var(--text); }
 
@@ -114,36 +165,65 @@ button:active { transform: scale(0.98); }
   height: 6px;
   background: var(--border);
   border-radius: 99px;
-  margin: 10px 0 20px;
+  margin: 8px 0 var(--gap);
   overflow: hidden;
 }
 #progress-fill { height: 100%; width: 0; background: var(--accent); transition: width 0.3s; }
 
-.question { text-align: center; margin-bottom: 20px; }
-#question-text { color: var(--muted); margin: 0 0 12px; }
-.prompt { font-size: 1.7rem; font-weight: 700; margin: 8px 0; }
+.quiz-body { display: flex; flex-direction: column; gap: 12px; }
 
+.quiz-ask { text-align: center; }
+#question-text { color: var(--muted); margin: 0; }
+.prompt {
+  font-size: clamp(1.3rem, 1rem + 1.6vw, 1.8rem);
+  font-weight: 700;
+  margin: 6px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.prompt-flag {
+  height: 1.1em;
+  width: auto;
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+/* Fixed-height stage so the layout doesn't jump; each flag keeps its own shape. */
+.flag-stage {
+  height: clamp(110px, 28vh, 240px);
+  height: clamp(110px, 28dvh, 240px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 .flag {
-  width: 100%;
-  max-width: 320px;
-  aspect-ratio: 3 / 2;
-  object-fit: contain;
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
   border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--bg);
+  box-shadow: 0 0 0 1px var(--border), 0 6px 18px rgba(0, 0, 0, 0.12);
 }
 
 .options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .option {
-  padding: 14px;
+  padding: 10px 14px;
   text-align: left;
   display: flex;
   gap: 10px;
   align-items: center;
-  min-height: 56px;
+  min-height: 52px;
+  line-height: 1.25;
 }
-.option:hover:not(:disabled) { border-color: var(--accent); }
+@media (hover: hover) {
+  .option:hover:not(:disabled) { border-color: var(--accent); }
+}
 .option .key {
+  flex: none;
   font-size: 0.75rem;
   color: var(--muted);
   border: 1px solid var(--border);
@@ -152,9 +232,33 @@ button:active { transform: scale(0.98); }
 }
 .option.correct { background: var(--correct-bg); border-color: var(--correct); }
 .option.wrong { background: var(--wrong-bg); border-color: var(--wrong); }
-.option:disabled { cursor: default; }
+.option:disabled { cursor: default; color: var(--text); }
 
-#mistakes { margin: 16px 0; }
+.quiz-answer .primary { margin-top: 0; }
+.options + .primary { margin-top: 12px; }
+
+#confirm-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+  transform: none;
+}
+
+/* Map questions: the card fills the screen and the map takes the free space. */
+.app.map-q {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 2 * var(--page-pad));
+  height: calc(100dvh - 2 * var(--page-pad));
+  min-height: 420px;
+}
+.app.map-q #quiz-screen,
+.app.map-q .quiz-body { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.app.map-q .quiz-stage { flex: 1; min-height: 200px; }
+.app.map-q .map-panel { height: 100%; }
+
+/* ---------- Results ---------- */
+#mistakes { margin: 16px 0 0; }
+#mistakes h3 { margin: 8px 0; }
 .mistake {
   display: flex;
   align-items: center;
@@ -162,13 +266,272 @@ button:active { transform: scale(0.98); }
   padding: 10px 0;
   border-bottom: 1px solid var(--border);
 }
-.mistake img { width: 48px; border-radius: 3px; border: 1px solid var(--border); }
+.mistake img { width: 48px; flex: none; border-radius: 3px; border: 1px solid var(--border); }
 .mistake .you { color: var(--wrong); font-size: 0.9rem; }
 
 .row { display: flex; gap: 10px; }
 
-@media (max-width: 480px) {
-  .app { padding: 20px; }
-  .options { grid-template-columns: 1fr; }
-  .prompt { font-size: 1.4rem; }
+@media (min-width: 720px) {
+  .mistake-list { display: grid; grid-template-columns: 1fr 1fr; column-gap: 24px; }
+}
+
+/* ---------- Map ---------- */
+.map-panel {
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--ocean-edge);
+  background: var(--ocean);
+}
+.map { position: absolute; inset: 0; }
+.world-map {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.world-map:active { cursor: grabbing; }
+
+.world-map .sphere { fill: var(--ocean); }
+.world-map .graticule {
+  fill: none;
+  stroke: var(--graticule);
+  vector-effect: non-scaling-stroke;
+}
+.world-map .others path {
+  fill: var(--land-other);
+  stroke: var(--land-border);
+  stroke-width: 0.5px;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+.world-map path.country {
+  fill: var(--land);
+  stroke: var(--land-border);
+  stroke-width: 0.6px;
+  vector-effect: non-scaling-stroke;
+  cursor: pointer;
+  transition: fill 0.15s;
+}
+.world-map .dot { cursor: pointer; }
+.world-map .dot .hit { fill: transparent; }
+.world-map .dot .mark {
+  fill: var(--land);
+  stroke: var(--land-border);
+  stroke-width: 1.2px;
+  vector-effect: non-scaling-stroke;
+  transition: fill 0.15s;
+}
+
+@media (hover: hover) {
+  .world-map:not(.locked) path.country:hover,
+  .world-map:not(.locked) .dot:hover .mark { fill: var(--land-hover); }
+}
+
+.world-map path.country.selected,
+.world-map .dot.selected .mark { fill: var(--accent); stroke: var(--accent); }
+.world-map path.country.correct,
+.world-map .dot.correct .mark { fill: var(--correct); stroke: var(--correct); }
+.world-map path.country.wrong,
+.world-map .dot.wrong .mark { fill: var(--wrong); stroke: var(--wrong); }
+.world-map path.country.selected,
+.world-map path.country.correct,
+.world-map path.country.wrong { stroke-width: 1.2px; }
+.world-map .dot.selected .mark,
+.world-map .dot.correct .mark,
+.world-map .dot.wrong .mark { stroke: var(--card); stroke-width: 2px; }
+.world-map.locked .country { cursor: default; }
+
+.world-map .map-label { pointer-events: none; animation: pop 0.35s ease-out both; }
+.world-map .map-label text {
+  font-size: 13px;
+  font-weight: 700;
+  fill: #fff;
+}
+.world-map .map-label.correct rect,
+.world-map .map-label.correct .pin { fill: var(--correct); }
+.world-map .map-label.wrong rect,
+.world-map .map-label.wrong .pin { fill: var(--wrong); }
+@media (prefers-color-scheme: dark) {
+  .world-map .map-label text { fill: #0b1020; }
+}
+@keyframes pop {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.map-controls {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.map-controls button {
+  width: 36px;
+  height: 36px;
+  min-height: 0;
+  padding: 0;
+  font-size: 1.15rem;
+  line-height: 1;
+  background: var(--card);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+@media (hover: hover) {
+  .map-controls button:hover { border-color: var(--accent); }
+}
+
+/* Hint and answer feedback float over the bottom of the map, so the map
+   never changes size (and loses its zoom) when you answer. */
+.map-hint,
+.feedback {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 20px);
+  margin: 0;
+  text-align: center;
+  border-radius: 10px;
+  pointer-events: none;
+}
+.map-hint {
+  padding: 5px 10px;
+  font-size: 0.8rem;
+  color: var(--muted);
+  background: var(--overlay);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.feedback {
+  padding: 10px 14px;
+  font-weight: 600;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  animation: pop 0.25s ease-out both;
+}
+.feedback.good { background: var(--correct-bg); color: var(--correct); border: 1px solid var(--correct); }
+.feedback.bad { background: var(--wrong-bg); color: var(--wrong); border: 1px solid var(--wrong); }
+
+/* Show the right instructions for touch screens vs mouse. */
+.touch-only { display: none; }
+@media (pointer: coarse) {
+  .touch-only { display: inline; }
+  .mouse-only { display: none; }
+}
+
+/* ---------- Phones (portrait) ---------- */
+@media (max-width: 560px) {
+  :root { --page-pad: 0px; --card-pad: 16px; --gap: 12px; }
+  body { padding: 0; }
+  /* Edge-to-edge card, clear of the notch and home bar. */
+  .app {
+    min-height: 100vh;
+    min-height: 100dvh;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    padding:
+      max(var(--card-pad), env(safe-area-inset-top))
+      max(var(--card-pad), env(safe-area-inset-right))
+      max(var(--card-pad), env(safe-area-inset-bottom))
+      max(var(--card-pad), env(safe-area-inset-left));
+  }
+  .app.map-q { min-height: 0; }
+  .options { grid-template-columns: 1fr; gap: 8px; }
+  .option { min-height: 48px; }
+  .stats { font-size: 0.88rem; gap: 4px; }
+  .field { margin: 16px 0; }
+}
+
+@media (max-width: 360px) {
+  .stats { font-size: 0.8rem; }
+  .chip { padding: 6px 10px; }
+}
+
+/* Short portrait phones (e.g. iPhone SE): tighten up. */
+@media (max-width: 560px) and (max-height: 700px) {
+  h1 { font-size: 1.3rem; }
+  .subtitle { font-size: 0.9rem; }
+  .field { margin: 10px 0; }
+  .label { margin-bottom: 6px; }
+  .chips { gap: 6px; }
+  .chip { min-height: 34px; padding: 5px 10px; font-size: 0.92rem; }
+  .quiz-body { gap: 8px; }
+  #question-text { font-size: 0.9rem; }
+  .flag-stage { height: clamp(100px, 24dvh, 200px); }
+  .option { min-height: 44px; padding: 8px 12px; }
+  .options { gap: 6px; }
+  .primary, .secondary { padding: 10px 16px; }
+}
+
+/* ---------- Short landscape screens (phones on their side) ----------
+   The flag or map goes on the left, question and answers on the right. */
+@media (orientation: landscape) and (max-height: 560px) {
+  :root { --page-pad: 0px; --card-pad: 12px; --gap: 8px; }
+  body { padding: 0; }
+  .app,
+  .app.wide {
+    max-width: none;
+    min-height: 100vh;
+    min-height: 100dvh;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    padding:
+      max(var(--card-pad), env(safe-area-inset-top))
+      max(var(--card-pad), env(safe-area-inset-right))
+      max(var(--card-pad), env(safe-area-inset-bottom))
+      max(var(--card-pad), env(safe-area-inset-left));
+  }
+
+  /* Start screen: two columns of settings so it fits without much scrolling. */
+  #start-screen:not(.hidden) {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 24px;
+    align-items: start;
+  }
+  #start-screen h1, #start-screen .subtitle { grid-column: 1 / -1; }
+  #start-screen .field { margin: 8px 0; }
+  #start-screen .field:nth-of-type(1) { grid-row: span 2; }
+  #start-screen .primary,
+  #start-screen .error,
+  #start-screen .muted:not(.subtitle) { grid-column: 2; margin-top: 8px; }
+
+  /* Quiz: fills the screen. */
+  .app.playing {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+  }
+  .app.playing #quiz-screen { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+  .progress-bar { margin: 6px 0 8px; }
+  .app.playing .quiz-body { flex: 1; min-height: 0; }
+  .app.playing .quiz-body.has-stage {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+    grid-template-areas: "stage ask" "stage answer";
+    gap: 8px 16px;
+  }
+  .quiz-body.has-stage .quiz-stage { grid-area: stage; min-height: 0; }
+  .quiz-body.has-stage .quiz-ask { grid-area: ask; }
+  .quiz-body.has-stage .quiz-answer { grid-area: answer; min-height: 0; overflow-y: auto; }
+  .quiz-body.has-stage .flag-stage { height: 100%; }
+  .app.map-q .quiz-stage { min-height: 0; }
+  #question-text { font-size: 0.9rem; }
+  .prompt { font-size: 1.3rem; }
+  .options { grid-template-columns: 1fr 1fr; gap: 6px; }
+  .option { min-height: 44px; padding: 6px 10px; font-size: 0.95rem; }
+  .primary, .secondary { padding: 10px 16px; }
+  .options + .primary { margin-top: 8px; }
+  .map-hint { font-size: 0.75rem; }
 }
